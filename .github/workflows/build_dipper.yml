@@ -1,0 +1,132 @@
+name: Build kernel for dipper
+on:
+  push:
+    paths:
+      - ".github/workflows/build_dipper.yml"
+  workflow_dispatch:
+permissions:
+  actions: write
+
+jobs:
+  build:
+    name: Build kernel by ${{ github.actor }}
+    runs-on: ubuntu-latest
+    env:
+      ARCH: "arm64"
+      MAKE_DEFCONFIG: "vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config"
+      GH_TOKEN: ${{ github.token }}
+    
+    steps:
+    - name: Download kernel source
+      uses: actions/checkout@v4
+      with:
+        repository: j2rong4cn/crdroid_kernel_xiaomi_dipper
+        ref: 'test'
+
+    - name: Set up swap
+      uses: pierotofy/set-swap-space@v1.0
+      with:
+        swap-size-gb: 10
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -y
+        # sudo apt install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+        sudo apt install curl binutils make python3 libssl-dev build-essential bc bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
+
+    - name: Retrieve information
+      run: |
+        sudo timedatectl set-timezone Asia/Shanghai
+        echo VERSION=$(date "+%y%m%d_%H%M")-$(git rev-parse HEAD | head -c 7) >> $GITHUB_ENV
+        BRANCH=$(git branch --show-current)
+        echo BRANCH=$BRANCH >> $GITHUB_ENV
+        echo CCACHE_KEY=$(basename ${GITHUB_WORKFLOW_REF%@*})-$BRANCH >> $GITHUB_ENV
+
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2.10
+      with:
+        key: ${{ env.CCACHE_KEY }}
+        max-size: 2G
+
+    - name: Restore toolchains from cache
+      uses: actions/cache/restore@v3
+      with:
+        path: toolchains
+        key: toolchains
+
+    - name: Check & Download toolchains
+      run: |
+        test -d toolchains/bin || (
+          git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && {
+            rm -r toolchains/.git
+            echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
+          }
+        )
+        test $? -eq 0 && echo ${{ github.workspace }}/toolchains/bin >> $GITHUB_PATH
+
+    - name: Build kernel
+      env:
+        CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+        CCACHE_NOHASHDIR: "true"
+        CCACHE_HARDLINK: "true"
+      run: |
+        export KBUILD_BUILD_HOST=Github-Action
+        export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
+
+        rm -rf KernelSU
+        rm -rf drivers/kernelsu
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+
+        cat <<'EOF' > arch/${{ env.ARCH }}/configs/my.config
+        CONFIG_TCP_CONG_ADVANCED=y
+        CONFIG_TCP_CONG_CUBIC=y
+        CONFIG_TCP_CONG_BBR=y
+        CONFIG_TCP_CONG_WESTWOOD=y
+        CONFIG_DEFAULT_WESTWOOD=y
+        
+        CONFIG_CRYPTO_ZSTD=y
+        CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="zstd"
+        EOF
+
+        make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
+        make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
+          LD=ld.lld ld-name=lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf OBJSIZE=llvm-size STRIP=llvm-strip \
+          KBUILD_COMPILER_STRING="Proton Clang" \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+    - name: Check output files
+      run: |
+        ls out/arch/${{ env.ARCH }}/boot/Image* && {
+          mkdir out/outputs
+          mv out/arch/${{ env.ARCH }}/boot/Image.gz-dtb out/outputs/
+          cp .config out/outputs/ 2>/dev/null || cp out/.config out/outputs/ 2>/dev/null || echo "Cannot find .config"
+          echo "CHECK_FILE_IS_OK=true" >> $GITHUB_ENV
+        }
+
+    - name: Upload output files
+      if: env.CHECK_FILE_IS_OK == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: dipper-kernel-${{ env.BRANCH }}-${{ env.VERSION }}
+        path: |
+          out/outputs/
+
+    - name: Delete old cache
+      #if: false
+      continue-on-error: true
+      run: |
+        gh extension install actions/gh-actions-cache
+        cacheKeysForPR=$(gh actions-cache list -L 100 -R ${{ github.repository }} | cut -f 1)
+        if test -n "$cacheKeysForPR"; then
+          for cacheKey in $cacheKeysForPR; do
+            test -n "${cacheKey##ccache-${{ env.CCACHE_KEY }}*}" || gh actions-cache delete $cacheKey -R ${{ github.repository }} --confirm
+          done
+        fi
+
+    - name: Save toolchains to cache
+      if: ${{ env.IS_SAVE_TOOLCHAINS == 'true' && !cancelled() }}
+      uses: actions/cache/save@v3
+      with:
+        path: toolchains
+        key: toolchains
