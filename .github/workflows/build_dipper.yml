@@ -113,11 +113,11 @@ jobs:
         wget -qO boot-source.img ${{ secrets.SOURCE_BOOT_IMAGE }}
         if test $? -eq 0 -a -f boot-source.img; then
           git clone --recursive --depth=1 -j $(nproc --all) https://android.googlesource.com/platform/system/tools/mkbootimg mkbootimg_tools -b master-kernel-build-2022 && {
-            FORMAT_MKBOOTING=$(echo `mkbootimg_tools/unpack_bootimg.py --boot_img=boot-source.img --format mkbootimg`)
+            FORMAT_MKBOOTING=$(mkbootimg_tools/unpack_bootimg.py --boot_img=boot-source.img --format mkbootimg)
             echo $FORMAT_MKBOOTING
             mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img && \
               cp kernel_source/out/arch/${{ env.ARCH }}/boot/Image out/kernel && \
-              mkbootimg_tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
+              eval mkbootimg_tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
           }
         fi
 
