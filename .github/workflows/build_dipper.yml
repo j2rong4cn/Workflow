@@ -100,7 +100,7 @@ jobs:
 
     - name: Check output files
       run: |
-        ls kernel_source/out/arch/${{ env.ARCH }}/boot/Image* && {
+        ls kernel_source/out/arch/${{ env.ARCH }}/boot/Image.gz-dtb && {
           mkdir outputs
           mv kernel_source/out/arch/${{ env.ARCH }}/boot/Image.gz-dtb outputs/
           cp kernel_source/.config outputs/ 2>/dev/null || cp kernel_source/out/.config outputs/ 2>/dev/null || echo "Cannot find .config"
@@ -114,9 +114,8 @@ jobs:
         if test $? -eq 0 -a -f boot-source.img; then
           git clone --recursive --depth=1 -j $(nproc --all) https://android.googlesource.com/platform/system/tools/mkbootimg mkbootimg_tools -b master-kernel-build-2022 && {
             FORMAT_MKBOOTING=$(mkbootimg_tools/unpack_bootimg.py --boot_img=boot-source.img --format mkbootimg)
-            echo $FORMAT_MKBOOTING
             mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img && \
-              cp kernel_source/out/arch/${{ env.ARCH }}/boot/Image out/kernel && \
+              cp kernel_source/out/arch/${{ env.ARCH }}/boot/Image.gz-dtb out/kernel && \
               eval mkbootimg_tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
           }
         fi
