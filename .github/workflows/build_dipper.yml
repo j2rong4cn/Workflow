@@ -14,8 +14,7 @@ jobs:
     env:
       ARCH: "arm64"
       MAKE_DEFCONFIG: "vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config"
-      GH_TOKEN: ${{ github.token }}
-    
+
     steps:
     - name: Download kernel source
       uses: actions/checkout@v4
@@ -118,7 +117,7 @@ jobs:
             echo $FORMAT_MKBOOTING
             mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img && \
               cp kernel_source/out/arch/${{ env.ARCH }}/boot/Image out/kernel && \
-              tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
+              mkbootimg_tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
           }
         fi
 
@@ -132,6 +131,8 @@ jobs:
 
     - name: Delete old cache
       #if: false
+      env:
+        GH_TOKEN: ${{ github.token }}
       continue-on-error: true
       run: |
         gh extension install actions/gh-actions-cache
