@@ -108,7 +108,7 @@ jobs:
         }
 
     - name: Make boot image
-      if: env.CHECK_FILE_IS_OK == 'true' && secrets.SOURCE_BOOT_IMAGE != ''
+      if: env.CHECK_FILE_IS_OK == 'true' && ${{ secrets.SOURCE_BOOT_IMAGE != '' }}
       run: |
         wget -qO boot-source.img ${{ secrets.SOURCE_BOOT_IMAGE }}
         if test $? -eq 0 -a -f boot-source.img; then
