@@ -43,6 +43,7 @@ jobs:
         BRANCH=$(git branch --show-current)
         echo BRANCH=$BRANCH >> $GITHUB_ENV
         echo CCACHE_KEY=$(basename ${GITHUB_WORKFLOW_REF%@*})-$BRANCH >> $GITHUB_ENV
+        test -n "${{ secrets.SOURCE_BOOT_IMAGE }}" && echo BUILD_BOOT_IMG=true >> $GITHUB_ENV
 
     - name: Set up ccache
       uses: hendrikmuhs/ccache-action@v1.2.10
@@ -108,7 +109,7 @@ jobs:
         }
 
     - name: Make boot image
-      if: env.CHECK_FILE_IS_OK == 'true' && ${{ secrets.SOURCE_BOOT_IMAGE != '' }}
+      if: env.CHECK_FILE_IS_OK == 'true' && env.BUILD_BOOT_IMG == 'true'
       run: |
         wget -qO boot-source.img ${{ secrets.SOURCE_BOOT_IMAGE }}
         if test $? -eq 0 -a -f boot-source.img; then
