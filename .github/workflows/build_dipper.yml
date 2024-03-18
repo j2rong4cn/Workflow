@@ -16,11 +16,14 @@ jobs:
       MAKE_DEFCONFIG: "vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config"
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
     - name: Download kernel source
       uses: actions/checkout@v4
       with:
         repository: j2rong4cn/crdroid_kernel_xiaomi_dipper
-        ref: 'test'
+        ref: '14'
         path: kernel_source
 
     - name: Set up swap
@@ -79,6 +82,9 @@ jobs:
         rm -rf KernelSU
         rm -rf drivers/kernelsu
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+
+        git apply ../patches/kernel/*.patch
+        git apply --directory KernelSU ../patches/kernelsu/*.patch
 
         cat <<'EOF' > arch/${{ env.ARCH }}/configs/my.config
         CONFIG_TCP_CONG_ADVANCED=y
