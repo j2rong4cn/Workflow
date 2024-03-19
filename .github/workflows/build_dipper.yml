@@ -81,9 +81,8 @@ jobs:
 
         rm -rf KernelSU
         rm -rf drivers/kernelsu
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6
 
-        ls ../patches/kernel/*.patch
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
 
