@@ -83,6 +83,7 @@ jobs:
         rm -rf drivers/kernelsu
         curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
 
+        ls ../patches/kernel/*.patch
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
 
