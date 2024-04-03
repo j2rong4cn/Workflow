@@ -4,6 +4,12 @@ on:
     paths:
       - ".github/workflows/build_dipper.yml"
   workflow_dispatch:
+    inputs:
+      KSU_VERSION:
+        description: "KernelSU Version"
+        type: string
+        default: '-'
+
 permissions:
   actions: write
 
@@ -81,7 +87,11 @@ jobs:
 
         rm -rf KernelSU
         rm -rf drivers/kernelsu
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.7.6
+        if [[ '${{ inputs.KSU_VERSION }}' = v*.* ]]; then
+          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
+        else
+          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+        fi
 
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
