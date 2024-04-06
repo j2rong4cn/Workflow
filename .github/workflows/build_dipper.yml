@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    name: Build kernel by ${{ github.actor }}
+    name: Build kernel & KernelSU Version ${{ inputs.KSU_VERSION }}
     runs-on: ubuntu-latest
     env:
       ARCH: "arm64"
@@ -87,11 +87,9 @@ jobs:
 
         rm -rf KernelSU
         rm -rf drivers/kernelsu
-        if [[ '${{ inputs.KSU_VERSION }}' = v*.* ]]; then
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
-        else
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
-        fi
+        ksu_version='${{ inputs.KSU_VERSION }}'
+        [ "$ksu_version" = '-' ] || ksu_version="-s '${{ inputs.KSU_VERSION }}'"
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | eval bash $ksu_version
 
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
@@ -105,6 +103,11 @@ jobs:
         
         CONFIG_CRYPTO_ZSTD=y
         CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="zstd"
+
+        CONFIG_KPROBES=y
+        CONFIG_HAVE_KPROBES=y
+        CONFIG_KPROBE_EVENTS=y
+        CONFIG_KSU=y
         EOF
 
         make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
