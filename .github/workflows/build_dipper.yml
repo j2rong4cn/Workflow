@@ -87,9 +87,7 @@ jobs:
 
         rm -rf KernelSU
         rm -rf drivers/kernelsu
-        ksu_version='${{ inputs.KSU_VERSION }}'
-        [ "$ksu_version" = '-' ] || ksu_version="-s '${{ inputs.KSU_VERSION }}'"
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | eval bash $ksu_version
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
 
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
