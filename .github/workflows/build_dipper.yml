@@ -29,7 +29,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: j2rong4cn/crdroid_kernel_xiaomi_dipper
-        ref: '14'
+        ref: '14.0'
         path: kernel_source
 
     - name: Set up swap
