@@ -29,7 +29,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: j2rong4cn/crdroid_kernel_xiaomi_dipper
-        ref: '14.0'
+        ref: '14'
         path: kernel_source
 
     - name: Set up swap
@@ -67,14 +67,21 @@ jobs:
 
     - name: Check & Download toolchains
       run: |
-        test -d toolchains/bin || (
-          git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && {
-            rm -r toolchains/.git
-            echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
-          }
+        [ -d toolchains/bin ] || (
+          mkdir -p toolchains
+          wget -O - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784e.tar.gz | tar -zxvC toolchains
+          # git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && rm -r toolchains/.git
+          [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
         )
-        test $? -eq 0 && echo ${{ github.workspace }}/toolchains/bin >> $GITHUB_PATH
+        [ $? -eq 0 ] && echo ${{ github.workspace }}/toolchains/bin >> $GITHUB_PATH
 
+    - name: Download kernelsu source
+      run: |
+        cd kernel_source
+        rm -rf KernelSU
+        rm -rf drivers/kernelsu
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
+        
     - name: Build kernel
       env:
         CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
@@ -82,15 +89,11 @@ jobs:
         CCACHE_HARDLINK: "true"
       run: |
         cd kernel_source
-        export KBUILD_BUILD_HOST=Github-Action
-        export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
-
-        rm -rf KernelSU
-        rm -rf drivers/kernelsu
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
-
         git apply ../patches/kernel/*.patch
         git apply --directory KernelSU ../patches/kernelsu/*.patch
+
+        export KBUILD_BUILD_HOST=Github-Action
+        export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
 
         cat <<'EOF' > arch/${{ env.ARCH }}/configs/my.config
         CONFIG_TCP_CONG_ADVANCED=y
@@ -111,7 +114,6 @@ jobs:
         make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
         make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
           LD=ld.lld ld-name=lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf OBJSIZE=llvm-size STRIP=llvm-strip \
-          KBUILD_COMPILER_STRING="Proton Clang" \
           CROSS_COMPILE=aarch64-linux-gnu- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
