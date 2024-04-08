@@ -113,7 +113,7 @@ jobs:
 
         make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
         make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
-          LD=ld.lld
+          LD=ld.lld \
           CROSS_COMPILE=aarch64-linux-gnu- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
