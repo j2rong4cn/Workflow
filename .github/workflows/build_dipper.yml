@@ -69,7 +69,7 @@ jobs:
       run: |
         [ -d toolchains/bin ] || (
           mkdir -p toolchains
-          wget -O - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784e.tar.gz | tar -zxvC toolchains
+          wget -qO - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784e.tar.gz | tar -zxvC toolchains
           # git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && rm -r toolchains/.git
           [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
         )
@@ -113,7 +113,7 @@ jobs:
 
         make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
         make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
-          LD=ld.lld ld-name=lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf OBJSIZE=llvm-size STRIP=llvm-strip \
+          LD=ld.lld
           CROSS_COMPILE=aarch64-linux-gnu- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
