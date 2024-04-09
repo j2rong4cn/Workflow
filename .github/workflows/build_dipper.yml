@@ -1,8 +1,5 @@
 name: Build kernel for dipper
 on:
-  push:
-    paths:
-      - ".github/workflows/build_dipper.yml"
   workflow_dispatch:
     inputs:
       KSU_VERSION:
@@ -15,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build kernel & KernelSU Version ${{ inputs.KSU_VERSION }}
+    name: Build kernel & KSU ${{ inputs.KSU_VERSION }}
     runs-on: ubuntu-latest
     env:
       ARCH: "arm64"
@@ -39,8 +36,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update -y
-        # sudo apt install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+        sudo apt update
+        sudo apt install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
         sudo apt install curl binutils make python3 libssl-dev build-essential bc bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
 
     - name: Retrieve information
@@ -69,7 +66,7 @@ jobs:
       run: |
         [ -d toolchains/bin ] || (
           mkdir -p toolchains
-          wget -qO - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784e.tar.gz | tar -zxvC toolchains
+          wget -qO - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel-build-2023/clang-r487747c.tar.gz | tar -zxvC toolchains
           # git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && rm -r toolchains/.git
           [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
         )
@@ -113,7 +110,7 @@ jobs:
 
         make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
         make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
-          LD=ld.lld \
+          LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
