@@ -103,7 +103,7 @@ jobs:
         path: toolchains
         key: toolchains
 
-    - name: Check & Download toolchains
+    - name: Check & Download Clang-aosp
       run: |
         [ -d toolchains/bin ] || (
           mkdir -p toolchains
@@ -112,7 +112,22 @@ jobs:
           [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true | tee -a $GITHUB_ENV
         )
         [ $? -eq 0 ] && echo ${{ github.workspace }}/toolchains/bin | tee -a $GITHUB_PATH
-        sudo apt install -y binutils-arm-linux-gnueabi binutils-aarch64-linux-gnu
+
+    - name: Check & Download Gcc-aosp
+      run: |
+        [ -d toolchains/gcc-64 ] || (
+          mkdir -p toolchains/gcc-64
+          wget -qO - https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz | tar -zxvC toolchains/gcc-64
+          [ -d toolchains/gcc-64/bin ] && echo IS_SAVE_TOOLCHAINS=true | tee -a $GITHUB_ENV
+        )
+        [ $? -eq 0 ] && echo "GCC_64=CROSS_COMPILE=${{ github.workspace }}/toolchains/gcc-64/bin/aarch64-linux-android-" | tee -a $GITHUB_ENV
+
+        [ -d toolchains/gcc-32 ] || (
+          mkdir -p toolchains/gcc-32
+          wget -qO - https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz | tar -zxvC toolchains/gcc-32
+          [ -d toolchains/gcc-32/bin ] && echo IS_SAVE_TOOLCHAINS=true | tee -a $GITHUB_ENV
+        )
+        [ $? -eq 0 ] && echo "GCC_32=CROSS_COMPILE_ARM32=${{ github.workspace }}/toolchains/gcc-32/bin/arm-linux-androideabi-" | tee -a $GITHUB_ENV
 
     - name: Build kernel
       env:
@@ -127,9 +142,7 @@ jobs:
 
         make O=out ARCH=${{ env.arch }} ${{ env.defconfig }} extra.config && \
         make -j $(nproc --all) O=out ARCH=${{ env.arch }} CC="ccache clang" \
-          LLVM=1 LLVM_IAS=1 \
-          CROSS_COMPILE=aarch64-linux-gnu- \
-          CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          LLVM=1 LLVM_IAS=1 CLANG_TRIPLE=aarch64-linux-gnu- ${{ env.GCC_64 }} ${{ env.GCC_32 }}
 
     - name: Check output files
       run: |
@@ -162,7 +175,7 @@ jobs:
           outputs/
 
     - name: Delete old cache
-      #if: false
+      if: false
       env:
         GH_TOKEN: ${{ github.token }}
       continue-on-error: true
