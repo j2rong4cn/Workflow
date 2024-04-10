@@ -1,56 +1,97 @@
-name: Build kernel for dipper
+name: Build kernel
+env:
+  arch: arm64
+  kernel_repository: j2rong4cn/android_kernel_xiaomi_sdm845
+  kernel_branch: 14
+  kernel_patch: |
+    allow-init-exec-ksud-under-nosuid.patch
+    support-umount-modules-kernel.patch
+  kernelsu_patch: |
+  defconfig: "vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config"
+  extconfig: |
+    CONFIG_TCP_CONG_ADVANCED=y
+    CONFIG_TCP_CONG_CUBIC=y
+    CONFIG_TCP_CONG_BBR=y
+    CONFIG_TCP_CONG_WESTWOOD=y
+    CONFIG_DEFAULT_WESTWOOD=y
+
+    CONFIG_CRYPTO_ZSTD=y
+    CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="zstd"
+
+    CONFIG_KPROBES=y
+    CONFIG_HAVE_KPROBES=y
+    CONFIG_KPROBE_EVENTS=y
+
 on:
   workflow_dispatch:
     inputs:
-      KSU_VERSION:
+      KSU:
         description: "KernelSU Version"
         type: string
-        default: '-'
+        default: "-"
 
 permissions:
   actions: write
 
 jobs:
   build:
-    name: Build kernel & KSU ${{ inputs.KSU_VERSION }}
+    name: "KSU: ${{ inputs.KSU }}"
     runs-on: ubuntu-latest
-    env:
-      ARCH: "arm64"
-      MAKE_DEFCONFIG: "vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config"
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Download kernel source
-      uses: actions/checkout@v4
-      with:
-        repository: j2rong4cn/crdroid_kernel_xiaomi_dipper
-        ref: '14'
-        path: kernel_source
-
-    - name: Set up swap
+    - name: Setup swap
       uses: pierotofy/set-swap-space@v1.0
       with:
         swap-size-gb: 10
 
-    - name: Install dependencies
+    - name: Download Kernel source
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.kernel_repository }}
+        ref: ${{ env.kernel_branch }}
+
+    - name: Setup KernelSU
       run: |
-        sudo apt update
-        sudo apt install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
-        sudo apt install curl binutils make python3 libssl-dev build-essential bc bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
+        rm -rf KernelSU
+        rm -rf drivers/kernelsu
+        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU }}'
 
     - name: Retrieve information
       run: |
-        cd kernel_source
-        sudo timedatectl set-timezone Asia/Shanghai
-        echo VERSION=$(date "+%y%m%d_%H%M")-$(git rev-parse HEAD | head -c 7) >> $GITHUB_ENV
+        sudo apt update
+        sudo timedatectl set-timezone Asia/Shanghai && date
+        echo VERSION=$(date "+%y%m%d_%H%M")-$(git rev-parse HEAD | head -c 7) | tee -a $GITHUB_ENV
         BRANCH=$(git branch --show-current)
-        echo BRANCH=$BRANCH >> $GITHUB_ENV
-        echo CCACHE_KEY=$(basename ${GITHUB_WORKFLOW_REF%@*})-$BRANCH >> $GITHUB_ENV
-        test -n "${{ secrets.SOURCE_BOOT_IMAGE }}" && echo BUILD_BOOT_IMG=true >> $GITHUB_ENV
+        echo BRANCH=$BRANCH | tee -a $GITHUB_ENV
+        echo CCACHE_KEY=$(basename ${GITHUB_WORKFLOW_REF%@*})-$BRANCH | tee -a $GITHUB_ENV
+        test -n "${{ secrets.SOURCE_BOOT_IMAGE }}" && echo BUILD_BOOT_IMG=true | tee -a $GITHUB_ENV
 
-    - name: Set up ccache
+    - name: Checkout this repo
+      uses: actions/checkout@v4
+      with:
+        path: this-repo
+
+    - name: Apply kernel patch
+      run: |
+        while read -r line; do
+            if [ -z "$line" ] || [[ "$line" == "#"* ]]; then
+                continue
+            fi
+            echo "Applying kernel patch: $line"
+            git apply "this-repo/patches/$line"
+        done <<<"$kernel_patch"
+
+    - name: Apply KernelSU patch
+      run: |
+        while read -r line; do
+            if [ -z "$line" ] || [[ "$line" == "#"* ]]; then
+                continue
+            fi
+            echo "Applying KernelSU patch: $line"
+            git apply -p2 --directory KernelSU/kernel "this-repo/patches/$line"
+        done <<<"$kernelsu_patch"
+
+    - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2.10
       with:
         key: ${{ env.CCACHE_KEY }}
@@ -68,70 +109,46 @@ jobs:
           mkdir -p toolchains
           wget -qO - https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel-build-2023/clang-r487747c.tar.gz | tar -zxvC toolchains
           # git clone --recursive --depth=1 -j $(nproc --all) "https://github.com/kdrag0n/proton-clang" toolchains -b master && rm -r toolchains/.git
-          [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true >> $GITHUB_ENV
+          [ -d toolchains/bin ] && echo IS_SAVE_TOOLCHAINS=true | tee -a $GITHUB_ENV
         )
-        [ $? -eq 0 ] && echo ${{ github.workspace }}/toolchains/bin >> $GITHUB_PATH
+        [ $? -eq 0 ] && echo ${{ github.workspace }}/toolchains/bin | tee -a $GITHUB_PATH
+        sudo apt install -y binutils-arm-linux-gnueabi binutils-aarch64-linux-gnu
 
-    - name: Download kernelsu source
-      run: |
-        cd kernel_source
-        rm -rf KernelSU
-        rm -rf drivers/kernelsu
-        curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s '${{ inputs.KSU_VERSION }}'
-        
     - name: Build kernel
       env:
         CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
         CCACHE_NOHASHDIR: "true"
         CCACHE_HARDLINK: "true"
       run: |
-        cd kernel_source
-        git apply ../patches/kernel/*.patch
-        git apply --directory KernelSU ../patches/kernelsu/*.patch
-
         export KBUILD_BUILD_HOST=Github-Action
         export KBUILD_BUILD_USER=$(echo ${{ github.actor }} | tr A-Z a-z)
 
-        cat <<'EOF' > arch/${{ env.ARCH }}/configs/my.config
-        CONFIG_TCP_CONG_ADVANCED=y
-        CONFIG_TCP_CONG_CUBIC=y
-        CONFIG_TCP_CONG_BBR=y
-        CONFIG_TCP_CONG_WESTWOOD=y
-        CONFIG_DEFAULT_WESTWOOD=y
-        
-        CONFIG_CRYPTO_ZSTD=y
-        CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="zstd"
+        echo "$extconfig" | tee arch/${{ env.arch }}/configs/extra.config
 
-        CONFIG_KPROBES=y
-        CONFIG_HAVE_KPROBES=y
-        CONFIG_KPROBE_EVENTS=y
-        CONFIG_KSU=y
-        EOF
-
-        make O=out ARCH=${{ env.ARCH }} ${{ env.MAKE_DEFCONFIG }} my.config && \
-        make -j $(nproc --all) O=out ARCH=${{ env.ARCH }} CC="ccache clang" \
+        make O=out ARCH=${{ env.arch }} ${{ env.defconfig }} extra.config && \
+        make -j $(nproc --all) O=out ARCH=${{ env.arch }} CC="ccache clang" \
           LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
           CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
     - name: Check output files
       run: |
-        ls kernel_source/out/arch/${{ env.ARCH }}/boot/Image.gz-dtb && {
+        ls out/arch/${{ env.arch }}/boot/Image.gz-dtb && {
           mkdir outputs
-          cp kernel_source/out/arch/${{ env.ARCH }}/boot/Image.gz-dtb outputs/
-          cp kernel_source/.config outputs/ 2>/dev/null || cp kernel_source/out/.config outputs/ 2>/dev/null || echo "Cannot find .config"
-          echo "CHECK_FILE_IS_OK=true" >> $GITHUB_ENV
+          cp out/arch/${{ env.arch }}/boot/Image.gz-dtb outputs/
+          cp .config outputs/ 2>/dev/null || cp out/.config outputs/ 2>/dev/null || echo "Cannot find .config"
+          echo CHECK_FILE_IS_OK=true | tee -a $GITHUB_ENV
         }
 
-    - name: Make boot image
+    - name: Build boot image
       if: env.CHECK_FILE_IS_OK == 'true' && env.BUILD_BOOT_IMG == 'true'
       run: |
         wget -qO boot-source.img ${{ secrets.SOURCE_BOOT_IMAGE }}
         if test $? -eq 0 -a -f boot-source.img; then
-          git clone --recursive --depth=1 -j $(nproc --all) https://android.googlesource.com/platform/system/tools/mkbootimg mkbootimg_tools -b master-kernel-build-2022 && {
-            FORMAT_MKBOOTING=$(mkbootimg_tools/unpack_bootimg.py --boot_img=boot-source.img --format mkbootimg)
-            mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img && \
-              cp outputs/Image.gz-dtb out/kernel && \
+          git clone --recursive --depth=1 -j $(nproc --all) https://android.googlesource.com/platform/system/tools/mkbootimg mkbootimg_tools -b main-kernel-build-2023 && {
+            FORMAT_MKBOOTING=$(mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img --format mkbootimg --out img_out)
+            mkbootimg_tools/unpack_bootimg.py --boot_img boot-source.img --out img_out && \
+              cp outputs/Image.gz-dtb img_out/kernel && \
               eval mkbootimg_tools/mkbootimg.py $FORMAT_MKBOOTING -o outputs/boot.img
           }
         fi
