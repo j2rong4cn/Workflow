@@ -91,13 +91,13 @@ jobs:
         done <<<"$kernelsu_patch"
 
     - name: Setup ccache
-      uses: hendrikmuhs/ccache-action@v1.2.10
+      uses: hendrikmuhs/ccache-action@v1.2.12
       with:
         key: ${{ env.CCACHE_KEY }}
         max-size: 2G
 
     - name: Restore toolchains from cache
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: toolchains
         key: toolchains
@@ -167,7 +167,7 @@ jobs:
 
     - name: Upload output files
       if: env.CHECK_FILE_IS_OK == 'true'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: dipper-kernel-${{ env.BRANCH }}-${{ env.VERSION }}
         path: |
@@ -190,7 +190,7 @@ jobs:
     - name: Save toolchains to cache
       if: ${{ env.IS_SAVE_TOOLCHAINS == 'true' && !cancelled() }}
       continue-on-error: true
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: toolchains
         key: toolchains
