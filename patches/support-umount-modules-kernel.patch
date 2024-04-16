@@ -1,5 +1,3 @@
-diff --git a/fs/namespace.c b/fs/namespace.c
-index 21fd423b1..585db4706 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -1694,6 +1694,40 @@ static inline bool may_mount(void)
