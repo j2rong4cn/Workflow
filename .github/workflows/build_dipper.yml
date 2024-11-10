@@ -9,16 +9,8 @@ env:
   kernelsu_patch: |
   defconfig: vendor/xiaomi/mi845_defconfig vendor/xiaomi/dipper.config
   extra_config: |
-    CONFIG_TCP_CONG_ADVANCED=y
-    CONFIG_TCP_CONG_CUBIC=y
-    CONFIG_TCP_CONG_BBR=y
-    CONFIG_TCP_CONG_WESTWOOD=y
-    CONFIG_DEFAULT_WESTWOOD=y
     CONFIG_TCP_CONG_HTCP=n
     CONFIG_TCP_CONG_BIC=n
-
-    CONFIG_CRYPTO_LZ4=y
-    CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="lz4"
 
     CONFIG_LOCALVERSION="-K"
     #KernelSU
@@ -173,6 +165,7 @@ jobs:
       if: env.CHECK_FILE_IS_OK == 'true'
       uses: actions/upload-artifact@v4
       with:
+        include-hidden-files: true
         name: dipper-kernel-${{ env.BRANCH }}-${{ env.VERSION }}
         path: |
           outputs/
