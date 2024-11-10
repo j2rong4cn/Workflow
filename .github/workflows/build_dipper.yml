@@ -2,7 +2,7 @@ name: Build kernel for dipper
 env:
   arch: arm64
   kernel_repository: j2rong4cn/android_kernel_xiaomi_sdm845
-  kernel_branch: 14
+  kernel_branch: a14
   kernel_patch: |
     allow-init-exec-ksud-under-nosuid.patch
     support-umount-modules-kernel.patch
@@ -14,11 +14,13 @@ env:
     CONFIG_TCP_CONG_BBR=y
     CONFIG_TCP_CONG_WESTWOOD=y
     CONFIG_DEFAULT_WESTWOOD=y
+    CONFIG_TCP_CONG_HTCP=n
+    CONFIG_TCP_CONG_BIC=n
 
-    CONFIG_CRYPTO_ZSTD=y
-    CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="zstd"
+    CONFIG_CRYPTO_LZ4=y
+    CONFIG_ZRAM_DEFAULT_COMP_ALGORITHM="lz4"
 
-    CONFIG_LOCALVERSION="-ksu"
+    CONFIG_LOCALVERSION="-K"
     #KernelSU
     CONFIG_KPROBES=y
     CONFIG_HAVE_KPROBES=y
@@ -30,7 +32,7 @@ on:
       KSUV:
         description: "KernelSU Version"
         type: string
-        default: "-"
+        default: "v0.9.3"
 
 jobs:
   build:
